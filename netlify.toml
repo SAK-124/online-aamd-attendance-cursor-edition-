@@ -1,12 +1,7 @@
 [build]
-  command = "npm --prefix frontend ci && npm --prefix frontend run build"
-  publish = "frontend/dist"
-  functions = "netlify/functions"
+  base = "frontend"             # where your package.json is
+  publish = "frontend/dist"     # the build output folder (Vite default)
+  command = "npm ci && npm run build"
 
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/process/:splat"
-  status = 200
-
-[[plugins]]
-  package = "@netlify/plugin-functions-python"
+[functions]
+  directory = "netlify/functions"
