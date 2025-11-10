@@ -108,9 +108,15 @@ export function normalisePath(event: HandlerEvent): string {
   return rawPath
 }
 
-const moduleDir = dirname(fileURLToPath(import.meta.url))
-const runtimeDir = moduleDir
-const pythonCli = join(runtimeDir, 'python_backend', 'cli.py')
+function getModuleDir(): string {
+  if (typeof import.meta.url !== 'undefined') {
+    return dirname(fileURLToPath(import.meta.url))
+  }
+  return process.cwd()
+}
+
+const moduleDir = getModuleDir()
+const pythonCli = join(moduleDir, 'python_backend', 'cli.py')
 const pythonExecutable =
   process.env.PYTHON_EXECUTABLE || process.env.PYTHON || process.env.PYTHON_BIN || 'python3'
 
@@ -125,7 +131,7 @@ export async function runPython(args: string[]): Promise<PythonResult> {
     let stdout = ''
     let stderr = ''
     const child = spawn(pythonExecutable, [pythonCli, ...args], {
-      cwd: runtimeDir,
+      cwd: moduleDir,
     })
     child.stdout.setEncoding('utf8')
     child.stdout.on('data', (chunk) => {
