@@ -1,74 +1,94 @@
-import React, { useMemo, useState, useEffect } from 'react'
+import React, { useMemo, useState } from 'react'
 
-function parseCsvNames(file) {
-  return new Promise((resolve) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      try {
-        const text = String(reader.result || '')
-        const lines = text.split(/\r?\n/).filter(Boolean)
-        if (lines.length === 0) return resolve([])
-        const header = lines[0].split(',').map(h => h.trim().toLowerCase())
-        const nameIdx = header.findIndex(h => h === 'name' || h.includes('participant') || h.includes('screen name'))
-        if (nameIdx === -1) return resolve([])
-        const set = new Set()
-        for (let i = 1; i < lines.length; i++) {
-          const cols = lines[i].split(',')
-          const nm = (cols[nameIdx] || '').trim()
-          if (nm) set.add(nm)
-        }
-        resolve(Array.from(set).sort())
-      } catch { resolve([]) }
-    }
-    reader.onerror = () => resolve([])
-    reader.readAsText(file)
-  })
-}
+const EMPTY_FLAGS = { naming: false, overlap: false, reconnect: false }
 
-export default function ExemptionsPanel({ zoomCsvFile, value, onChange }) {
-  const [names, setNames] = useState([])
+export default function ExemptionsPanel({ options, loading, error, value, onChange }) {
   const [query, setQuery] = useState('')
-
-  useEffect(() => {
-    let mounted = true
-    if (zoomCsvFile) {
-      parseCsvNames(zoomCsvFile).then(n => { if (mounted) setNames(n) })
-    } else {
-      setNames([])
-    }
-    return () => { mounted = false }
-  }, [zoomCsvFile])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return names
-    return names.filter(n => n.toLowerCase().includes(q))
-  }, [names, query])
+    if (!q) return options
+    return options.filter(({ display, key }) => (
+      display.toLowerCase().includes(q) || key.toLowerCase().includes(q)
+    ))
+  }, [options, query])
 
-  function toggle(name, key) {
-    const k = `NAME:${name}`
-    const cur = value[k] || { naming: false, overlap: false, reconnect: false }
-    const next = { ...value, [k]: { ...cur, [key]: !cur[key] } }
+  function toggle(key, flag) {
+    const current = value[key] || EMPTY_FLAGS
+    const next = { ...value, [key]: { ...current, [flag]: !current[flag] } }
     onChange(next)
   }
 
+  const activeCount = Object.values(value || {}).reduce((acc, flags) => (
+    acc + (flags.naming || flags.overlap || flags.reconnect ? 1 : 0)
+  ), 0)
+
   return (
-    <div className="card">
-      <h3>Exemptions</h3>
-      <input placeholder="Search name…" value={query} onChange={(e) => setQuery(e.target.value)} />
-      <div style={{ maxHeight: 280, overflow: 'auto', marginTop: 8 }}>
-        {filtered.map(n => {
-          const k = `NAME:${n}`
-          const ex = value[k] || { naming: false, overlap: false, reconnect: false }
-          return (
-            <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '6px 0', borderBottom: '1px solid #202845' }}>
-              <div style={{ flex: 1 }}>{n}</div>
-              <label><input type="checkbox" checked={ex.naming} onChange={() => toggle(n, 'naming')} /> Naming</label>
-              <label><input type="checkbox" checked={ex.overlap} onChange={() => toggle(n, 'overlap')} /> Overlap</label>
-              <label><input type="checkbox" checked={ex.reconnect} onChange={() => toggle(n, 'reconnect')} /> Reconnect</label>
-            </div>
-          )
-        })}
+    <div className="card panel">
+      <div className="panel-header">
+        <div>
+          <h3>Exemptions</h3>
+          <p className="muted">Override penalties or duplicate warnings for specific students.</p>
+        </div>
+        <span className="badge">{activeCount} active</span>
+      </div>
+
+      <div className="panel-toolbar">
+        <input
+          placeholder="Search ERP, name, or key…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </div>
+
+      <div className="panel-body">
+        {loading && <p className="muted">Scanning CSV… this matches the desktop app&apos;s key list.</p>}
+        {!loading && error && <p className="error-text">{error}</p>}
+        {!loading && !error && options.length === 0 && (
+          <p className="muted">Upload a Zoom participants CSV to configure exemptions.</p>
+        )}
+
+        {!loading && !error && options.length > 0 && (
+          <ul className="exemption-list">
+            {filtered.map(({ key, display }) => {
+              const flags = value[key] || EMPTY_FLAGS
+              return (
+                <li key={key}>
+                  <div className="exemption-main">
+                    <strong>{display}</strong>
+                    <span className="muted mono">{key}</span>
+                  </div>
+                  <div className="exemption-flags">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={flags.naming}
+                        onChange={() => toggle(key, 'naming')}
+                      />
+                      Naming
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={flags.overlap}
+                        onChange={() => toggle(key, 'overlap')}
+                      />
+                      Dual devices
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={flags.reconnect}
+                        onChange={() => toggle(key, 'reconnect')}
+                      />
+                      Reconnects
+                    </label>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
       </div>
     </div>
   )

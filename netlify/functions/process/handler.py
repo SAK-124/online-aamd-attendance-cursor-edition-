@@ -11,7 +11,12 @@ def health():
     return {"ok": True}
 
 @app.post("/api/process")
-async def process(zoom_csv: UploadFile = File(...), roster: UploadFile | None = File(None), params: str = Form("{}"), exemptions: str = Form("{}")):
+async def process(
+    zoom_csv: UploadFile = File(...),
+    roster: UploadFile | None = File(None),
+    params: str = Form("{}"),
+    exemptions: str = Form("{}"),
+):
     try:
         params_obj = json.loads(params or "{}")
     except Exception:
@@ -25,10 +30,30 @@ async def process(zoom_csv: UploadFile = File(...), roster: UploadFile | None = 
     roster_bytes = await roster.read() if roster is not None else None
 
     try:
-        out_bytes = logic.process_request(zoom_bytes, roster_bytes, params_obj, exemptions_obj)
+        out_bytes, meta = logic.process_request(
+            zoom_bytes, roster_bytes, params_obj, exemptions_obj
+        )
     except Exception as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
 
-    return Response(content=out_bytes, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": "attachment; filename=zoom_attendance_processed.xlsx"})
+    headers = {
+        "Content-Disposition": "attachment; filename=zoom_attendance_processed.xlsx",
+        "X-Zoom-Attendance-Meta": json.dumps(meta),
+    }
+    return Response(
+        content=out_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers=headers,
+    )
+
+
+@app.post("/api/keys")
+async def list_keys(zoom_csv: UploadFile = File(...)):
+    zoom_bytes = await zoom_csv.read()
+    try:
+        items = logic.extract_keys_from_bytes(zoom_bytes)
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
+    return items
 
 handler = Mangum(app)
