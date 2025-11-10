@@ -1,0 +1,19 @@
+{
+  "name": "zoom-attendance-functions",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node ./copy-python.mjs",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "@netlify/functions": "^2.0.2",
+    "busboy": "^1.6.0"
+  },
+  "devDependencies": {
+    "@types/busboy": "^1.5.4",
+    "@types/node": "^20.11.17",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.3"
+  }
+}

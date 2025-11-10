@@ -1,6 +1,8 @@
 # Node
 frontend/node_modules/
 frontend/dist/
+netlify/functions/node_modules/
+netlify/functions/dist/
 
 # Python
 __pycache__/

@@ -1,6 +1,6 @@
 [build]
-  command = "npm --prefix frontend ci && npm --prefix frontend run build"
+  command = "npm --prefix netlify/functions ci && npm --prefix netlify/functions run build && npm --prefix frontend ci && npm --prefix frontend run build"
   publish = "frontend/dist"
 
 [functions]
-  directory = "netlify/functions"
+  directory = "netlify/functions/dist"
