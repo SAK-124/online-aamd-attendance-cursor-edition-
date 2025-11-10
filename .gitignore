@@ -1,0 +1,14 @@
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Python
+__pycache__/
+*.pyc
+
+# Local env
+.env
+.netlify
+
+# Misc
+.DS_Store
