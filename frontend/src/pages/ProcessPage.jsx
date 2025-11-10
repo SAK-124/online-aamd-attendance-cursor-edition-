@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import ExemptionsPanel from '../components/ExemptionsPanel.jsx'
+import { apiFetch } from '../utils/api.js'
 
 const PREF_KEY = 'za_prefs_v1'
 
@@ -74,14 +75,8 @@ export default function ProcessPage() {
     setExemptionError('')
     const fd = new FormData()
     fd.append('zoom_csv', zoomCsv)
-    fetch('/api/keys', { method: 'POST', body: fd })
-      .then(async (res) => {
-        if (!res.ok) {
-          const text = await res.text().catch(() => '')
-          throw new Error(text || `Request failed (${res.status})`)
-        }
-        return res.json()
-      })
+    apiFetch('/keys', { method: 'POST', body: fd })
+      .then((res) => res.json())
       .then((items) => {
         if (cancelled) return
         setExemptionOptions(items)
@@ -98,7 +93,9 @@ export default function ProcessPage() {
       })
       .catch((err) => {
         if (cancelled) return
-        setExemptionError(err.message || 'Unable to read CSV. Ensure it is the Zoom participant export.')
+        setExemptionError(
+          err?.message || 'Unable to read CSV. Ensure it is the Zoom participant export.'
+        )
       })
       .finally(() => {
         if (!cancelled) setExemptionLoading(false)
@@ -141,11 +138,7 @@ export default function ProcessPage() {
 
     setBusy(true)
     try {
-      const res = await fetch('/api/process', { method: 'POST', body: fd })
-      if (!res.ok) {
-        const t = await res.text().catch(() => '')
-        throw new Error(t || `Server returned ${res.status}`)
-      }
+      const res = await apiFetch('/process', { method: 'POST', body: fd })
       const metaHeader = res.headers.get('x-zoom-attendance-meta')
       if (metaHeader) {
         try {
