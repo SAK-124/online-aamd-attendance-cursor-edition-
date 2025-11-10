@@ -9,7 +9,9 @@ const BASE_CANDIDATES = [
   ...ENV_BASES,
   import.meta.env.DEV ? `${DEV_ORIGIN}/api` : null,
   import.meta.env.DEV ? `${DEV_ORIGIN}/.netlify/functions` : null,
+  import.meta.env.DEV ? `${DEV_ORIGIN}/.netlify/functions/process` : null,
   '/api',
+  '/.netlify/functions/process',
   '/.netlify/functions',
 ].filter(Boolean)
 
