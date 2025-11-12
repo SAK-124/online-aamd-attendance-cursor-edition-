@@ -5,9 +5,6 @@ import { createWriteStream } from 'fs'
 import { promises as fs } from 'fs'
 import { tmpdir } from 'os'
 import { basename, join } from 'path'
-import { dirname } from 'path'
-import { fileURLToPath } from 'url'
-import { spawn } from 'child_process'
 
 export interface UploadedFile {
   fieldName: string
@@ -106,46 +103,6 @@ export function normalisePath(event: HandlerEvent): string {
     return '/process'
   }
   return rawPath
-}
-
-function getModuleDir(): string {
-  if (typeof import.meta.url !== 'undefined') {
-    return dirname(fileURLToPath(import.meta.url))
-  }
-  return process.cwd()
-}
-
-const moduleDir = getModuleDir()
-const pythonCli = join(moduleDir, 'python_backend', 'cli.py')
-const pythonExecutable =
-  process.env.PYTHON_EXECUTABLE || process.env.PYTHON || process.env.PYTHON_BIN || 'python3'
-
-export interface PythonResult {
-  status: number | null
-  stdout: string
-  stderr: string
-}
-
-export async function runPython(args: string[]): Promise<PythonResult> {
-  return new Promise<PythonResult>((resolve, reject) => {
-    let stdout = ''
-    let stderr = ''
-    const child = spawn(pythonExecutable, [pythonCli, ...args], {
-      cwd: moduleDir,
-    })
-    child.stdout.setEncoding('utf8')
-    child.stdout.on('data', (chunk) => {
-      stdout += chunk
-    })
-    child.stderr.setEncoding('utf8')
-    child.stderr.on('data', (chunk) => {
-      stderr += chunk
-    })
-    child.on('error', (err) => reject(err))
-    child.on('close', (code) => {
-      resolve({ status: code, stdout, stderr })
-    })
-  })
 }
 
 export function withCors(response: HandlerResponse): HandlerResponse {

@@ -4,9 +4,13 @@ import {
   cleanupFiles,
   jsonResponse,
   parseMultipart,
-  runPython,
   withCors,
 } from './shared.js'
+import {
+  processRequest,
+  extractKeysFromCsv,
+  bufferToBase64,
+} from './logic.js'
 
 export async function handleProcess(event: HandlerEvent): Promise<HandlerResponse> {
   const { fields, files } = await parseMultipart(event)
@@ -19,45 +23,29 @@ export async function handleProcess(event: HandlerEvent): Promise<HandlerRespons
   const paramsJson = fields['params'] || '{}'
   const exemptionsJson = fields['exemptions'] || '{}'
   try {
-    const args = [
-      'process',
-      '--zoom',
-      zoomFile.path,
-      '--params-json',
-      paramsJson,
-      '--exemptions-json',
-      exemptionsJson,
-    ]
-    if (rosterFile) {
-      args.push('--roster', rosterFile.path)
-    }
-    const result = await runPython(args)
-    if (result.status !== 0) {
-      throw new Error(result.stderr || 'Python processing failed')
-    }
-    let payload: any
+    let params: any
+    let exemptions: any
     try {
-      payload = JSON.parse(result.stdout.trim() || '{}')
-    } catch (err) {
-      throw new Error(`Unable to parse Python response: ${err instanceof Error ? err.message : String(err)}`)
+      params = JSON.parse(paramsJson)
+    } catch {
+      params = {}
     }
-    if (!payload || payload.ok !== true) {
-      const message = payload?.error || 'Processing failed'
-      throw new Error(message)
+    try {
+      exemptions = JSON.parse(exemptionsJson)
+    } catch {
+      exemptions = {}
     }
-    if (typeof payload.data !== 'string') {
-      throw new Error('Invalid response payload: data missing')
-    }
-    const buffer = Buffer.from(payload.data, 'base64')
-    const meta = payload.meta ?? {}
+    const result = await processRequest(zoomFile.path, rosterFile?.path ?? null, params, exemptions)
+    const buffer = result.buffer
+    const meta = result.meta
     return withCors({
       statusCode: 200,
       isBase64Encoded: true,
-      body: buffer.toString('base64'),
+      body: bufferToBase64(buffer),
       headers: {
         'Content-Type':
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': 'attachment; filename=zoom_attendance_processed.xlsx',
+        'Content-Disposition': `attachment; filename=${meta.output_xlsx}`,
         'X-Zoom-Attendance-Meta': JSON.stringify(meta),
       },
     })
@@ -74,21 +62,8 @@ export async function handleKeys(event: HandlerEvent): Promise<HandlerResponse> 
     return badRequest('zoom_csv file is required')
   }
   try {
-    const result = await runPython(['keys', '--zoom', zoomFile.path])
-    if (result.status !== 0) {
-      throw new Error(result.stderr || 'Python key extraction failed')
-    }
-    let payload: any
-    try {
-      payload = JSON.parse(result.stdout.trim() || '{}')
-    } catch (err) {
-      throw new Error(`Unable to parse Python response: ${err instanceof Error ? err.message : String(err)}`)
-    }
-    if (!payload || payload.ok !== true || !Array.isArray(payload.items)) {
-      const message = payload?.error || 'Unable to read keys'
-      throw new Error(message)
-    }
-    return jsonResponse(200, payload.items)
+    const items = await extractKeysFromCsv(zoomFile.path)
+    return jsonResponse(200, items)
   } finally {
     await cleanupFiles(Object.values(files))
   }
